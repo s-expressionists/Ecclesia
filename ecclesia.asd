@@ -1,7 +1,10 @@
 (cl:in-package #:asdf-user)
 
-(defsystem cleavir-code-utilities
-  :depends-on (:acclimation)
+(defsystem #:ecclesia
+  :description "Utilities for parsing Lisp code."
+  :author "Robert Strandh <robert.strandh@gmail.com>"
+  :license "MIT"
+  :depends-on (#:acclimation)
   :serial t
   :components
   ((:file "packages")

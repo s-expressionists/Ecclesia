@@ -1,4 +1,4 @@
-(cl:in-package #:cleavir-code-utilities)
+(cl:in-package #:ecclesia)
 
 (defmethod acclimation:report-condition
     ((condition form-must-be-proper-list) stream (language acclimation:english))

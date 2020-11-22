@@ -1,4 +1,4 @@
-(cl:in-package #:cleavir-code-utilities)
+(cl:in-package #:ecclesia)
 
 (defun check-argcount (form min-argcount max-argcount)
   (when (< (length (cdr form)) min-argcount)

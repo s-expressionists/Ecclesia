@@ -1,4 +1,4 @@
-(cl:in-package #:cleavir-code-utilities)
+(cl:in-package #:ecclesia)
 
 (defun check-form-proper-list (form)
   (unless (proper-list-p form)

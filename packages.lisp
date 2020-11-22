@@ -1,6 +1,6 @@
 (cl:in-package #:common-lisp-user)
 
-(defpackage #:cleavir-code-utilities
+(defpackage #:ecclesia
   (:use #:common-lisp)
   (:export #:list-structure
            #:proper-list-p

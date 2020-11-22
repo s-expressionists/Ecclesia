@@ -1,4 +1,4 @@
-(cl:in-package #:cleavir-code-utilities)
+(cl:in-package #:ecclesia)
 
 (define-condition code-condition ()
   ((%code :initarg :code :reader code)))

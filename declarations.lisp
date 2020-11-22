@@ -1,4 +1,4 @@
-(cl:in-package #:cleavir-code-utilities)
+(cl:in-package #:ecclesia)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Take a list of declaration specifiers and return a list of
