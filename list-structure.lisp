@@ -63,6 +63,26 @@
 ;;; the object is NIL, 0 is returned.
 (defun proper-list-length (object)
   (values (ignore-errors (list-length object))))
+
+;;; Return true if and only if OBJECT is a circular list.
+;;;
+;;; This definition relies on the fact that LIST-LENGTH returns a
+;;; single value when it does not signal an error.  So in that case,
+;;; IGNORE-ERRORS returns a single value, and the value of the
+;;; variable SECOND is thus NIL.  And if OBJECT is a circular list,
+;;; then the only value returned by LIST-LENGTH is NIL, so that is
+;;; also the value of FIRST.  If LIST-LENGTH does not signal an error
+;;; and does not return NIL, then OBJECT is a proper list, so
+;;; CIRCULAR-LIST-P returns NIL.  If LIST-LENGTH is given anything
+;;; other than a circular list or a proper list, it signals an error,
+;;; so then IGNORE-ERRORS returns two values, NIL and a condition.  In
+;;; this case, SECOND is not NIL, so NIL is returned from
+;;; CIRCULAR-LIST-P.
+(defun circular-list-p (object)
+  (and (consp object)
+       (multiple-value-bind (first second)
+           (ignore-errors (list-length object))
+         (and (null first) (null second)))))
 	     
 ;;; If all we want is to know whether some object is a dotted list, we
 ;;; use the method of the slow and the fast pointer.  This function
