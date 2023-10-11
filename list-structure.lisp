@@ -167,26 +167,3 @@
 		 (setq slow (cdr slow))
 		 (incf count 2)
 		 (go again))))))
-	     
-;;; If all we want is to know whether some object is a circular list,
-;;; we use the method of the slow and the fast pointer.  This function
-;;; returns true if the object is a circular list, and false for any
-;;; other object.
-(defun circular-list-p (object)
-  (cond  ((atom object) nil)
-	 (t (let ((slow object)
-		  (fast (cdr object)))
-	      (declare (type cons slow))
-	      (tagbody
-	       again
-		 (unless (consp fast)
-		   (return-from circular-list-p nil))
-		 (when (eq fast slow)
-		   (return-from circular-list-p t))
-		 (setq fast (cdr fast))
-		 (unless (consp fast)
-		   (return-from circular-list-p nil))
-		 (setq fast (cdr fast))
-		 (setq slow (cdr slow))
-		 (go again))))))
-	     
