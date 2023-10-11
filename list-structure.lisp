@@ -47,57 +47,22 @@
 ;;; Check that an object is a proper list.  Return true if the object
 ;;; is a proper list.  Return false if the object is an atom other
 ;;; than NIL or if the list is dotted or circular.
+;;;
+;;; If LIST-LENGTH is given a proper list, then it returns the length
+;;; of that list, which is a number.  If LIST-LENGTH is given a
+;;; circular list, it returns NIL which is not a number.  If
+;;; LIST-LENGTH is given anything other than a proper list or a
+;;; circular list, it signals an error, so then IGNORE-ERRORS returns
+;;; NIL as its first value, which again is not a number.
 (defun proper-list-p (object)
-  (cond  ((null object) t)
-	 ((atom object) nil)
-	 (t (let ((slow object)
-		  (fast (cdr object)))
-	      (declare (type cons slow))
-	      (tagbody
-	       again
-		 (unless (consp fast)
-		   (return-from proper-list-p
-		     (if (null fast) t nil)))
-		 (when (eq fast slow)
-		   (return-from proper-list-p nil))
-		 (setq fast (cdr fast))
-		 (unless (consp fast)
-		   (return-from proper-list-p
-		     (if (null fast) t nil)))
-		 (setq fast (cdr fast))
-		 (setq slow (cdr slow))
-		 (go again))))))
+  (numberp (ignore-errors (list-length object))))
 	     
 ;;; Check that an object is a proper list, and if so, return the
 ;;; number of cons cells in the list.  Return false if the object is
 ;;; an atom other than NIL or if the list is dotted or circular.  If
 ;;; the object is NIL, 0 is returned.
 (defun proper-list-length (object)
-  (cond  ((null object) 0)
-	 ((atom object) nil)
-	 (t (let ((slow object)
-		  (fast (cdr object))
-		  (count 1))
-	      (declare (type cons slow))
-	      ;; We assume that the implementation is such that a
-	      ;; fixnum is able to hold the maximum number of CONS
-	      ;; cells possible in the heap.
-	      (declare (type fixnum count))
-	      (tagbody
-	       again
-		 (unless (consp fast)
-		   (return-from proper-list-length
-		     (if (null fast) count nil)))
-		 (when (eq fast slow)
-		   (return-from proper-list-length nil))
-		 (setq fast (cdr fast))
-		 (unless (consp fast)
-		   (return-from proper-list-length
-		     (if (null fast) (1+ count) nil)))
-		 (setq fast (cdr fast))
-		 (setq slow (cdr slow))
-		 (incf count 2)
-		 (go again))))))
+  (values (ignore-errors (list-length object))))
 	     
 ;;; If all we want is to know whether some object is a dotted list, we
 ;;; use the method of the slow and the fast pointer.  This function
