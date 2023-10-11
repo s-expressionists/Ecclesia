@@ -84,33 +84,14 @@
            (ignore-errors (list-length object))
          (and (null first) (null second)))))
 	     
-;;; If all we want is to know whether some object is a dotted list, we
-;;; use the method of the slow and the fast pointer.  This function
-;;; returns true if the object is an atom other than NIL (the
-;;; degenerate case of a dotted list) or if the list is terminated by
-;;; some atom other than NIL.  It returns false if the object is NIL,
-;;; if the object is a list terminated by NIL, or of the object is a
-;;; circular list.
+;;; This function returns true if the object is an atom other than NIL
+;;; (the degenerate case of a dotted list) or if the list is
+;;; terminated by some atom other than NIL.  It returns false if the
+;;; object is NIL, if the object is a list terminated by NIL, or of
+;;; the object is a circular list.
 (defun dotted-list-p (object)
-  (cond  ((null object) nil)
-	 ((atom object) 0)
-	 (t (let ((slow object)
-		  (fast (cdr object)))
-	      (declare (type cons slow))
-	      (tagbody
-	       again
-		 (unless (consp fast)
-		   (return-from dotted-list-p
-		     (if (null fast) nil t)))
-		 (when (eq fast slow)
-		   (return-from dotted-list-p nil))
-		 (setq fast (cdr fast))
-		 (unless (consp fast)
-		   (return-from dotted-list-p
-		     (if (null fast) nil t)))
-		 (setq fast (cdr fast))
-		 (setq slow (cdr slow))
-		 (go again))))))
+  (and (not (proper-list-p object))
+       (not (circular-list-p object))))
 	     
 ;;; Check that an object is a dotted list, and if so, return the
 ;;; number of cons cells in the list.  Return false if the object is
