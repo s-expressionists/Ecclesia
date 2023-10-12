@@ -1472,5 +1472,3 @@
       (when (allow-other-keys parsed-lambda-list)
 	(push '&allow-other-keys result)))
     (reverse result)))
-    
-
