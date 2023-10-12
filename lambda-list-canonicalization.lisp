@@ -78,7 +78,7 @@
 ;;; satiated before being used.  But for now, we use lists instead of
 ;;; standard objects.
 
-(defun lambda-list-keyword (intrinsic-feature)
+(defun keyword-name (intrinsic-feature)
   (first intrinsic-feature))
 
 (defun arity (intrinsic-feature)
@@ -100,8 +100,8 @@
 ;;; OCCURRENCE-COUNT is The number of times this lambda-list keyword
 ;;; can occur in any lambda list.
 (defun make-intrinsic-feature
-    (lambda-list-keyword arity occurrence-count order)
-  (list lambda-list-keyword arity occurrence-count order))
+    (keyword-name arity occurrence-count order)
+  (list keyword-name arity occurrence-count order))
 
 (defparameter *intrinsic-features*
   (list (make-intrinsic-feature '&whole            1  1 100)
@@ -114,11 +114,11 @@
         (make-intrinsic-feature '&aux              '* 1 600)))
 
 (defun intrinsic-keywords ()
-  (mapcar #'lambda-list-keyword *intrinsic-features*))
+  (mapcar #'keyword-name *intrinsic-features*))
 
 (defun find-feature (keyword)
   (find keyword *intrinsic-features*
-        :test #'eq :key #'lambda-list-keyword))
+        :test #'eq :key #'keyword-name))
 
 (defun compute-positions (lambda-list keywords)
   (append (loop with end-position = -1
@@ -625,9 +625,9 @@
         unless (member (first group) keywords :test #'eq)
           return group))
 
-(defun extract-named-group (canonicalized-lambda-list lambda-list-keyword)
+(defun extract-named-group (canonicalized-lambda-list keyword-name)
   (loop with keywords = (intrinsic-keywords)
         for group in canonicalized-lambda-list
         when (and (not (null group))
-                  (eq (first group) lambda-list-keyword))
+                  (eq (first group) keyword-name))
           return group))
