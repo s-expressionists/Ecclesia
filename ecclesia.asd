@@ -14,5 +14,5 @@
    (:file "form")
    (:file "list-structure")
    (:file "declarations")
-   (:file "lambda-lists")
+   (:file "lambda-list-parsing")
    (:file "destructuring")))
