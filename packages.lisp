@@ -71,4 +71,28 @@
            #:malformed-destructuring-tree
            #:malformed-aux
            #:malformed-lambda-list-pattern
-           #:required-must-be-variable))
+           #:required-must-be-variable
+           ;; From new lambda-list canonicalizers
+           #:intrinsic-feature
+           #:*intrinsic-features*
+           #:canonicalize-ordinary-required
+           #:canonicalize-ordinary-rest
+           #:*ordinary-canonicalizers*
+           #:*generic-function-canonicalizers*
+           #:*specialized-canonicalizers*
+           #:*macro-canonicalizers*
+           #:*destructuring-canonicalizers*
+           #:*defsetf-canonicalizers*
+           #:*define-modify-macro-canonicalizers*
+           #:*define-method-combination-canonicalizers*
+           #:canonicalize-lambda-list
+           #:canonicalize-ordinary-lambda-list
+           #:canonicalize-generic-function-lambda-list
+           #:canonicalize-specialized-lambda-list
+           #:canonicalize-macro-lambda-list
+           #:canonicalize-destructuring-lambda-list
+           #:canonicalize-defsetf-lambda-list
+           #:canonicalize-define-modify-macro-lambda-list
+           #:canonicalize-define-method-combination-arguments-lambda-list
+           #:extract-required
+           #:extract-named-group))
