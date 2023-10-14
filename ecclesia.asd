@@ -16,4 +16,5 @@
    (:file "declarations")
    (:file "lambda-list-parsing")
    (:file "lambda-list-canonicalization")
-   (:file "destructuring")))
+   (:file "destructuring")
+   (:file "canonicalized-destructuring")))
