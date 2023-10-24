@@ -246,6 +246,38 @@
 ;;;  * (var init-form)
 
 
+(defgeneric required (parsed-lambda-list))
+
+(defgeneric (setf required) (required parsed-lambda-list))
+
+(defgeneric environment (parsed-lambda-list))
+
+(defgeneric (setf environment) (environment parsed-lambda-list))
+
+(defgeneric whole (parsed-lambda-list))
+
+(defgeneric (setf whole) (whole parsed-lambda-list))
+
+(defgeneric optionals (parsed-lambda-list))
+
+(defgeneric (setf optionals) (optionals parsed-lambda-list))
+
+(defgeneric rest-body (parsed-lambda-list))
+
+(defgeneric (setf rest-body) (rest-body parsed-lambda-list))
+
+(defgeneric keys (parsed-lambda-list))
+
+(defgeneric (setf keys) (keys parsed-lambda-list))
+
+(defgeneric allow-other-keys (parsed-lambda-list))
+
+(defgeneric (setf allow-other-keys) (allow-other-keys parsed-lambda-list))
+
+(defgeneric aux (parsed-lambda-list))
+
+(defgeneric (setf aux) (aux parsed-lambda-list))
+
 (defclass lambda-list ()
   (;; A possibly empty list of patterns.
    (%required :initform '() :initarg :required :accessor required)

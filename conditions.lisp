@@ -1,11 +1,19 @@
 (cl:in-package #:ecclesia)
 
+(defgeneric code (condition))
+
 (define-condition code-condition ()
   ((%code :initarg :code :reader code)))
+
+(defgeneric form (condition))
 
 (define-condition form-must-be-proper-list
     (program-error acclimation:condition)
   ((%form :initarg :form :reader form)))
+
+(defgeneric min-argcount (condition))
+
+(defgeneric max-argcount (condition))
 
 ;;; A max-argcount of NIL means no upper bound.
 (define-condition invalid-number-of-arguments 
@@ -44,6 +52,8 @@
     (program-error code-condition acclimation:condition)
   ())
 
+(defgeneric lambda-list-keyword (condition))
+
 (define-condition lambda-list-keyword-not-allowed
     (program-error code-condition acclimation:condition)
   ((%keyword :initarg :keyword :reader lambda-list-keyword)))
@@ -52,6 +62,8 @@
     (program-error code-condition acclimation:condition)
   ((%keyword :initarg :keyword :reader lambda-list-keyword)))
 
+(defgeneric lambda-list-parameters (condition))
+
 (define-condition lambda-list-too-many-parameters
     (program-error code-condition acclimation:condition)
   ((%parameters :initarg :parameters :reader lambda-list-parameters)))
@@ -59,6 +71,10 @@
 (define-condition multiple-occurrences-of-lambda-list-keyword
     (program-error code-condition acclimation:condition)
   ((%keyword :initarg :keyword :reader lambda-list-keyword)))
+
+(defgeneric lambda-list-keyword1 (condition))
+
+(defgeneric lambda-list-keyword2 (condition))
 
 (define-condition incorrect-keyword-order
     (program-error code-condition acclimation:condition)
@@ -187,6 +203,8 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;
 ;;;  Conditions for forms with BODY.
+
+(defgeneric body (condition))
 
 (define-condition ordinary-body-must-be-proper-list
     (style-warning acclimation:condition)
