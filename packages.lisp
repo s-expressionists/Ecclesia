@@ -97,4 +97,5 @@
            #:canonicalize-define-modify-macro-lambda-list
            #:canonicalize-define-method-combination-arguments-lambda-list
            #:extract-required
-           #:extract-named-group))
+           #:extract-named-group
+           #:extract-lambda-list-variables))
