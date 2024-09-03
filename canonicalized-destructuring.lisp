@@ -195,6 +195,8 @@
   (let* ((remaining canonicalized-lambda-list)
          (bindings '())
          (ignored-variables '()))
+    (when (first-group-is remaining '&whole)
+      (push `(,(second (pop remaining)) ,variable) bindings))
     (unless (or (null remaining)
                 (member (first (first remaining)) (intrinsic-keywords)
                         :test #'eq))

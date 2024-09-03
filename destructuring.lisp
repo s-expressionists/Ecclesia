@@ -265,13 +265,18 @@
 	       ;; circular.  the remaining list is simply matched with
 	       ;; the &rest/&body pattern.
 	       nil))
-	(let ((rest-bindings
+	(let ((whole-bindings
+                (if (eq (whole lambda-list) :none)
+                    '()
+                    (destructure-pattern (whole lambda-list) var)))
+              (rest-bindings
 		(if (eq (rest-body lambda-list) :none)
 		    '()
 		    (destructure-pattern (rest-body lambda-list) var2)))
 	      (key-bindings
 		(destructure-keys (keys lambda-list) var2)))
-	  (values (append required-bindings
+	  (values (append whole-bindings
+                          required-bindings
 			  optional-bindings
 			  rest-bindings
 			  (reverse error-check-bindings)
