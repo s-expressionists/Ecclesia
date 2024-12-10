@@ -653,7 +653,7 @@
 ;;; According to CLtL2.
 
 (defun parse-macro (name lambda-list body &optional environment)
-  (declare (ignore name environment)) ; For now.
+  (declare (ignore environment)) ; For now.
   (let* ((parsed-lambda-list (parse-macro-lambda-list lambda-list))
 	 (env-var (environment parsed-lambda-list))
 	 (final-env-var (if (eq env-var :none) (gensym) env-var))
@@ -674,7 +674,7 @@
 	 (let ((,args-var (cdr ,final-form-var)))
 	   (let* ,bindings
 	     (declare (ignore ,@ignored-variables))
-	     ,@body))))))
+	     (block ,name ,@body)))))))
 	
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;
@@ -684,7 +684,7 @@
 ;;; destructures the lambda list from the arguments.
 
 (defun parse-compiler-macro (name lambda-list body &optional environment)
-  (declare (ignore name environment)) ; For now.
+  (declare (ignore environment)) ; For now.
   (let* ((parsed-lambda-list (parse-macro-lambda-list lambda-list))
 	 (env-var (environment parsed-lambda-list))
 	 (final-env-var (if (eq env-var :none) (gensym) env-var))
@@ -710,14 +710,13 @@
 			      (cdr ,final-form-var))))
 	   (let* ,bindings
 	     (declare (ignore ,@ignored-variables))
-	     ,@body))))))
+	     (block ,name ,@body)))))))
 	
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;
 ;;; PARSE-DEFTYPE
 
 (defun parse-deftype (name lambda-list body)
-  (declare (ignore name))
   (let* ((parsed-lambda-list (parse-deftype-lambda-list lambda-list))
 	 (env-var (environment parsed-lambda-list))
 	 (final-env-var (if (eq env-var :none) (gensym) env-var))
@@ -738,4 +737,4 @@
 	 (let ((,args-var (cdr ,final-form-var)))
 	   (let* ,bindings
 	     (declare (ignore ,@ignored-variables))
-	     ,@body))))))
+	     (block ,name ,@body)))))))
