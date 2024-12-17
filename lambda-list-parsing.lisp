@@ -755,7 +755,7 @@
   (cond ((and
 	  ;; there is a keyword yet to be processed.
 	  (not (null (cdr positions)))
-	  ;; that keyword is &environment.
+	  ;; that keyword is &rest or &body.
 	  (or (eq (elt lambda-list (car positions)) '&rest)
 	      (eq (elt lambda-list (car positions)) '&body)))
 	 ;; The arity has already been checked so we know there is
