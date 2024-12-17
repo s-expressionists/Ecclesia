@@ -39,6 +39,9 @@
            #:parse-macro
            #:parse-compiler-macro
            #:parse-deftype
+           #:parse-macro-using-canonicalization
+           #:parse-compiler-macro-using-canonicalization
+           #:parse-deftype-using-canonicalization
            #:parse-destructuring-bind
            #:lambda-lists-congruent-p
            #:generate-congruent-lambda-list
