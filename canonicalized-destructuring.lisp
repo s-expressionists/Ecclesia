@@ -62,14 +62,13 @@
 ;;; may be a variable or a pattern.  Return a list of bindings and a
 ;;; list of variables to ignore.
 (defun destructure-canonicalized-required
-    (required variable canonicalized-lambda-list invoking-form-variable)
+    (required variable canonicalized-lambda-list)
   (let ((bindings '())
         (ignored-variables '())
         (not-enough-arguments-form
           `(error 'too-few-arguments
                   :lambda-list
-                  ',(reduce #'append canonicalized-lambda-list)
-                  :invoking-form ,invoking-form-variable)))
+                  ',(reduce #'append canonicalized-lambda-list))))
     (loop for pattern in required
           do (if (symbolp pattern)
                  (progn (push `(,pattern (if (null ,variable)
@@ -88,7 +87,7 @@
                    (multiple-value-bind
                          (nested-bindings nested-ignored-variables)
                        (destructure-canonicalized-lambda-list
-                        pattern temp invoking-form-variable)
+                        pattern temp)
                      (setf bindings
                            (append nested-bindings bindings))
                      (setf ignored-variables
@@ -116,7 +115,7 @@
 ;;; a pattern.  Return a list of bindings and a list of variables to
 ;;; ignore.
 (defun destructure-canonicalized-rest/body
-    (pattern variable invoking-form-variable)
+    (pattern variable)
   (let ((bindings '())
         (ignored-variables '()))
     (if (symbolp pattern)
@@ -126,7 +125,7 @@
                 bindings)
           (multiple-value-bind (nested-bindings nested-ignored-variables)
               (destructure-canonicalized-lambda-list
-               pattern temp invoking-form-variable)
+               pattern temp)
             (setf bindings
                   (append nested-bindings bindings))
             (setf ignored-variables
@@ -136,15 +135,14 @@
 ;;; Destructure a list of &KEY parameters.  Return a list of bindings
 ;;; and a list of variables to ignore.
 (defun destructure-canonicalized-key
-    (key variable canonicalized-lambda-list invoking-form-variable allow-other-keys)
+    (key variable canonicalized-lambda-list allow-other-keys)
   (let* ((bindings '())
          (ignored-variables '())
          (keywords (mapcar #'caar key))
          (odd-number-of-keyword-arguments-form
            `(error 'odd-number-of-keyword-arguments
                    :lambda-list
-                   ',(reduce #'append canonicalized-lambda-list)
-                   :invoking-form ,invoking-form-variable))
+                   ',(reduce #'append canonicalized-lambda-list)))
          (check-keywords-form
            (let ((temp (gensym)))
              `(let ((,temp ,variable))
@@ -157,8 +155,7 @@
                        (error 'invalid-keyword
                               :keyword (first ,temp)
                               :lambda-list
-                              ',(reduce #'append canonicalized-lambda-list)
-                              :invoking-form ,invoking-form-variable)
+                              ',(reduce #'append canonicalized-lambda-list))
                        (progn (setf ,temp (cddr ,temp))
                               (go again)))
                  out)))))
@@ -194,7 +191,7 @@
 ;;; DESTRUCTURE-CANONICALIZED-LAMBDA-LIST
 
 (defun destructure-canonicalized-lambda-list
-    (canonicalized-lambda-list variable invoking-form-variable)
+    (canonicalized-lambda-list variable)
   (let* ((remaining canonicalized-lambda-list)
          (bindings '())
          (ignored-variables '()))
@@ -203,7 +200,7 @@
                         :test #'eq))
       (multiple-value-bind (nested-bindings nested-ignored-variables)
           (destructure-canonicalized-required
-           (pop remaining) variable canonicalized-lambda-list invoking-form-variable)
+           (pop remaining) variable canonicalized-lambda-list)
         (setf bindings
               (append nested-bindings bindings))
         (setf ignored-variables
@@ -221,14 +218,13 @@
         (push `(,temp (if (not (null ,variable))
                           (error 'too-many-arguments
                                  :lambda-list
-                                 ',(reduce #'append canonicalized-lambda-list)
-                                 :invoking-form ,invoking-form-variable)))
+                                 ',(reduce #'append canonicalized-lambda-list))))
               bindings)))
     (when (or (first-group-is remaining '&rest)
               (first-group-is remaining '&body))
       (multiple-value-bind (nested-bindings nested-ignored-variables)
           (destructure-canonicalized-rest/body
-           (second (pop remaining)) variable invoking-form-variable)
+           (second (pop remaining)) variable)
         (setf bindings
               (append nested-bindings bindings))
         (setf ignored-variables
@@ -244,7 +240,6 @@
              (rest group)
              variable
              canonicalized-lambda-list
-             invoking-form-variable
              allow-other-keys)
           (setf bindings
                 (append nested-bindings bindings))
