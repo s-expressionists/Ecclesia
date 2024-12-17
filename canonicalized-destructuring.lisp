@@ -256,45 +256,45 @@
 ;;;
 ;;; According to CLtL2.
 
-;; (defun parse-macro (name lambda-list body &optional environment)
-;;   (declare (ignore environment)) ; For now.
-;;   (let* ((canonicalized-lambda-list
-;;            (canonicalize-macro-lambda-list lambda-list))
-;;          (environment-group
-;;            (extract-named-group canonicalized-lambda-list '&environment))
-;;          (environment-parameter
-;;            (if (null environment-group) (gensym) (second environment-group)))
-;;          (whole-group
-;;            (extract-named-group canonicalized-lambda-list '&whole))
-;;          (whole-parameter
-;;            (if (null whole-group) (gensym) (second whole-group)))
-;;          (remaining
-;;            (remove '&environment
-;;                    (remove '&whole canonicalized-lambda-list
-;;                            :key #'first :test #'eq)
-;;                    :key #'first :test #'eq))
-;;          (args-var (gensym)))
-;;     (multiple-value-bind (declarations documentation forms)
-;;         (separate-function-body body)
-;;       (multiple-value-bind (bindings ignored-variables)
-;;           (destructure-canonicalized-lambda-list
-;;            remaining args-var whole-parameter)
-;;         `(lambda (,whole-parameter ,environment-parameter)
-;;            ,@(if (null documentation) '() (list documentation))
-;;            ;; If the lambda list does not contain &environment, then
-;;            ;; we IGNORE the GENSYMed parameter to avoid warnings.
-;;            ;; If the lambda list does contain &environment, we do
-;;            ;; not want to make it IGNORABLE because we would want a
-;;            ;; warning if it is not used then.
-;;            ,@(if (null environment-group)
-;;                  `((declare (ignore ,environment-parameter)))
-;;                  `())
-;;            (block ,name
-;;              (let ((,args-var (rest ,whole-parameter)))
-;;                (let* ,(reverse bindings)
-;;                  (declare (ignore ,@ignored-variables))
-;;                  ,@declarations
-;;                  ,@forms))))))))
+(defun parse-macro-using-canonicalization
+    (name lambda-list body &optional environment)
+  (declare (ignore environment)) ; For now.
+  (let* ((canonicalized-lambda-list
+           (canonicalize-macro-lambda-list lambda-list))
+         (environment-group
+           (extract-named-group canonicalized-lambda-list '&environment))
+         (environment-parameter
+           (if (null environment-group) (gensym) (second environment-group)))
+         (whole-group
+           (extract-named-group canonicalized-lambda-list '&whole))
+         (whole-parameter
+           (if (null whole-group) (gensym) (second whole-group)))
+         (remaining
+           (remove '&environment
+                   (remove '&whole canonicalized-lambda-list
+                           :key #'first :test #'eq)
+                   :key #'first :test #'eq))
+         (args-var (gensym)))
+    (multiple-value-bind (declarations documentation forms)
+        (separate-function-body body)
+      (multiple-value-bind (bindings ignored-variables)
+          (destructure-canonicalized-lambda-list remaining args-var)
+        `(lambda (,whole-parameter ,environment-parameter)
+           ,@(if (null documentation) '() (list documentation))
+           ;; If the lambda list does not contain &environment, then
+           ;; we IGNORE the GENSYMed parameter to avoid warnings.
+           ;; If the lambda list does contain &environment, we do
+           ;; not want to make it IGNORABLE because we would want a
+           ;; warning if it is not used then.
+           ,@(if (null environment-group)
+                 `((declare (ignore ,environment-parameter)))
+                 `())
+           (block ,name
+             (let ((,args-var (rest ,whole-parameter)))
+               (let* ,(reverse bindings)
+                 (declare (ignore ,@ignored-variables))
+                 ,@declarations
+                 ,@forms))))))))
 
 ;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; ;;;
