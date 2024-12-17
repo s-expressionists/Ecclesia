@@ -407,8 +407,7 @@
     (multiple-value-bind (declarations forms)
         (separate-ordinary-body body)
       (multiple-value-bind (bindings ignored-variables)
-          (destructure-canonicalized-lambda-list
-           remaining args-var whole-parameter)
+          (destructure-canonicalized-lambda-list remaining args-var)
         `(let* ((,whole-parameter ,form)
                 (,args-var ,whole-parameter)
                 ,@(reverse bindings))
