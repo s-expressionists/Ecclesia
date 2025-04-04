@@ -336,16 +336,17 @@
            ,@(if (null environment-group)
                  `((declare (ignore ,environment-parameter)))
                  `())
-           (let ((,args-var (if (and (eq (car ,whole-parameter) 'funcall)
-                                   (consp (cdr ,whole-parameter))
-                                   (consp (cadr ,whole-parameter))
-                                   (eq (car (cadr ,whole-parameter)) 'function))
-                              (cddr ,whole-parameter)
-                              (cdr ,whole-parameter))))
-             (let* ,(reverse bindings)
-               (declare (ignore ,@ignored-variables))
-               ,@declarations
-               ,@forms)))))))
+           (block ,name
+             (let ((,args-var (if (and (eq (car ,whole-parameter) 'funcall)
+                                       (consp (cdr ,whole-parameter))
+                                       (consp (cadr ,whole-parameter))
+                                       (eq (car (cadr ,whole-parameter)) 'function))
+                                  (cddr ,whole-parameter)
+                                  (cdr ,whole-parameter))))
+               (let* ,(reverse bindings)
+                 (declare (ignore ,@ignored-variables))
+                 ,@declarations
+                 ,@forms))))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;
