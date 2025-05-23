@@ -689,7 +689,7 @@
 ;;;
 ;;; According to CLtL2.
 
-(defun parse-macro (name lambda-list body &optional environment)
+(defun parse-macro (name lambda-list body &optional environment header-declarations)
   (declare (ignore environment)) ; For now.
   (let* ((parsed-lambda-list (parse-macro-lambda-list lambda-list))
 	 (env-var (environment parsed-lambda-list))
@@ -710,6 +710,7 @@
 	   ,@(if (eq env-var :none)
 	         `((declare (ignore ,final-env-var)))
 	         `())
+           (declare ,@header-declarations)
            ,documentation
 	   (let ((,args-var (cdr ,final-form-var)))
 	     (let* ,bindings
@@ -724,7 +725,8 @@
 ;;; This function differs from parse-macro only in the code that
 ;;; destructures the lambda list from the arguments.
 
-(defun parse-compiler-macro (name lambda-list body &optional environment)
+(defun parse-compiler-macro (name lambda-list body
+                             &optional environment header-declarations)
   (declare (ignore environment)) ; For now.
   (let* ((parsed-lambda-list (parse-macro-lambda-list lambda-list))
 	 (env-var (environment parsed-lambda-list))
@@ -745,6 +747,7 @@
 	   ,@(if (eq env-var :none)
 	         `((declare (ignore ,final-env-var)))
 	         `())
+           (declare ,@header-declarations)
            ,documentation
 	   (let ((,args-var (if (and (eq (car ,final-form-var) 'funcall)
 				  (consp (cdr ,final-form-var))
@@ -761,7 +764,9 @@
 ;;;
 ;;; PARSE-DEFTYPE
 
-(defun parse-deftype (name lambda-list body)
+(defun parse-deftype (name lambda-list body
+                      &optional environment header-declarations)
+  (declare (ignore environment))
   (let* ((parsed-lambda-list (parse-deftype-lambda-list lambda-list))
 	 (env-var (environment parsed-lambda-list))
 	 (final-env-var (if (eq env-var :none) (gensym) env-var))
@@ -781,8 +786,11 @@
 	   ,@(if (eq env-var :none)
 	         `((declare (ignore ,final-env-var)))
 	         `())
+           (declare ,@header-declarations)
            ,documentation
-	   (let ((,args-var (cdr ,final-form-var)))
+	   (let ((,args-var (if (consp ,final-form-var)
+                                (cdr ,final-form-var)
+                                nil)))
 	     (let* ,bindings
 	       (declare (ignore ,@ignored-variables))
                ,@declarations
