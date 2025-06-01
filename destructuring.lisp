@@ -31,10 +31,10 @@
 ;;; standard-object.
 
 ;;; The function DESTRUCTURE-REQUIRED and DESTRUCTURE-OPTIONALS return
-;;; two values:
+;;; three values:
 ;;;
 ;;;  * A list of binding forms to be used in a LET*.
-;;;
+;;;  * A list of variables to be declared IGNORE.
 ;;;  * A variable to be used to destructure the remaining pattern.
 
 ;;; Destructure the required parameters of a lambda list.
@@ -43,18 +43,21 @@
 ;;; either the keyword :NONE, or a list of patterns.
 (defun destructure-required (required var)
   (if (or (eq required :none) (null required))
-      (values '() var)
+      (values '() '() var)
       (let ((temp1 (gensym))
 	    (temp2 (gensym)))
-	(multiple-value-bind (bindings rest-var)
-	    (destructure-required (cdr required) temp1)
-	  (values (append `((,temp1 (if (consp ,var)
-					(cdr ,var)
-					(error "required end early")))
-			    (,temp2 (car ,var)))
-			  (destructure-pattern (car required) temp2)
-			  bindings)
-		  rest-var)))))
+        (multiple-value-bind (carbindings carign)
+            (destructure-pattern (car required) temp2)
+	  (multiple-value-bind (bindings cdrign rest-var)
+	      (destructure-required (cdr required) temp1)
+	    (values (append `((,temp1 (if (consp ,var)
+					  (cdr ,var)
+					  (error "required end early")))
+			      (,temp2 (car ,var)))
+			    carbindings
+			    bindings)
+                    (append carign cdrign)
+		    rest-var))))))
 
 ;;; Destructure the optional parameters of a lambda list.
 ;;;
@@ -87,36 +90,39 @@
 ;;;     signaled.
 (defun destructure-optionals (optionals var)
   (if (or (eq optionals :none) (null optionals))
-      (values '() var)
+      (values '() '() var)
       (let ((optional (car optionals))
 	    (temp1 (gensym))
 	    (temp2 (gensym)))
-	(multiple-value-bind (bindings rest-var)
-	    (destructure-optionals (cdr optionals) temp1)
-	  (values (append `((,temp1 (if (consp ,var)
-					(cdr ,var)
-					(if (null ,var)
-					    '()
-					    (error "optional expected"))))
-			    ;; If the object is not a CONS, then it is
-			    ;; either NIL in which case we destructure
-			    ;; the init-arg instead, or else it is an
-			    ;; atom other than NIL and we have already
-			    ;; signaled an error before, so we don't
-			    ;; need to handle that case again.
-			    (,temp2 (if (consp ,var)
-					(car ,var)
-					,(cadr optional)))
-			    ;; If a supplied-p-parameter exists, then
-			    ;; we give it the value TRUE whenever the
-			    ;; object is a CONS, even though later
-			    ;; an error might be signaled because there
-			    ;; is no match.
-			    ,@(if (consp (cddr optional))
-				  `((,(caddr optional) (consp ,var)))))
-			  (destructure-pattern (car optional) temp2)
-			  bindings)
-		  rest-var)))))
+        (multiple-value-bind (carbindings carign)
+            (destructure-pattern (car optional) temp2)
+	  (multiple-value-bind (cdrbindings cdrign rest-var)
+	      (destructure-optionals (cdr optionals) temp1)
+	    (values (append `((,temp1 (if (consp ,var)
+					  (cdr ,var)
+					  (if (null ,var)
+					      '()
+					      (error "optional expected"))))
+			      ;; If the object is not a CONS, then it is
+			      ;; either NIL in which case we destructure
+			      ;; the init-arg instead, or else it is an
+			      ;; atom other than NIL and we have already
+			      ;; signaled an error before, so we don't
+			      ;; need to handle that case again.
+			      (,temp2 (if (consp ,var)
+					  (car ,var)
+					  ,(cadr optional)))
+			      ;; If a supplied-p-parameter exists, then
+			      ;; we give it the value TRUE whenever the
+			      ;; object is a CONS, even though later
+			      ;; an error might be signaled because there
+			      ;; is no match.
+			      ,@(if (consp (cddr optional))
+				    `((,(caddr optional) (consp ,var)))))
+                            carbindings
+			    cdrbindings)
+                    (append carign cdrign)
+		    rest-var))))))
 
 ;;; Destructure the keyword parameters of a lambda list.
 ;;;
@@ -142,45 +148,51 @@
 ;;;    pattern.
 (defun destructure-keys (keys var)
   (if (or (eq keys :none) (null keys))
-      '()
+      (values '() '())
       (let ((key (car keys))
 	    (temp (gensym)))
-	(append `(;; What we do in step 1 depends on whether there is
-		  ;; a supplied-p-parameter or not.  If there is, then
-		  ;; in step 1, we return a list of two things:
-		  ;;
-		  ;;  * a boolean indicating whether we found the
-		  ;;    keyword.
-		  ;;
-		  ;;  * either the argument found, or the value of the
-		  ;;    init-form if no argument was found.
-		  ;;
-		  ;; If there is no supplied-p-parameter, then we just
-		  ;; return the argument found or the value of the
-		  ;; init-form if no argument was found.
-		  (,temp
-		   ,(if (consp (cddr key))
-			`(loop for rem = ,var then (cddr rem)
-			       while (consp rem)
-			       when (eq (car rem) ',(caar key))
-				 return (list t (cadr rem))
-			       finally (return (list nil ,(cadr key))))
-			`(loop for rem = ,var then (cddr rem)
-			       while (consp rem)
-			       when (eq (car rem) ',(caar key))
-				 return (cadr rem)
-			       finally (return ,(cadr key)))))
-		  ;; If there is no supplied-p-parameter, then we are
-		  ;; done.  If there is, we must get it from the first
-		  ;; element of the list computed in step 1, and we must
-		  ;; replace that list with its second element.
-		  ,@(if (consp (cddr key))
-			`((,(caddr key)
-			   (prog1 (car ,temp)
-			     (setf ,temp (cadr ,temp)))))
-			'()))
-		(destructure-pattern (cadar key) temp)
-		(destructure-keys (cdr keys) var)))))
+        (multiple-value-bind (carbindings carign)
+            (destructure-pattern (cadar key) temp)
+          (multiple-value-bind (cdrbindings cdrign)
+              (destructure-keys (cdr keys) var)
+            (values
+	     (append `(;; What we do in step 1 depends on whether there is
+		       ;; a supplied-p-parameter or not.  If there is, then
+		       ;; in step 1, we return a list of two things:
+		       ;;
+		       ;;  * a boolean indicating whether we found the
+		       ;;    keyword.
+		       ;;
+		       ;;  * either the argument found, or the value of the
+		       ;;    init-form if no argument was found.
+		       ;;
+		       ;; If there is no supplied-p-parameter, then we just
+		       ;; return the argument found or the value of the
+		       ;; init-form if no argument was found.
+		       (,temp
+		        ,(if (consp (cddr key))
+			     `(loop for rem = ,var then (cddr rem)
+			            while (consp rem)
+			            when (eq (car rem) ',(caar key))
+				      return (list t (cadr rem))
+			            finally (return (list nil ,(cadr key))))
+			     `(loop for rem = ,var then (cddr rem)
+			            while (consp rem)
+			            when (eq (car rem) ',(caar key))
+				      return (cadr rem)
+			            finally (return ,(cadr key)))))
+		       ;; If there is no supplied-p-parameter, then we are
+		       ;; done.  If there is, we must get it from the first
+		       ;; element of the list computed in step 1, and we
+		       ;; must replace that list with its second element.
+		       ,@(if (consp (cddr key))
+			     `((,(caddr key)
+			        (prog1 (car ,temp)
+			          (setf ,temp (cadr ,temp)))))
+			     '()))
+                     carbindings
+                     cdrbindings)
+             (append carign cdrign)))))))
 
 ;;; We return two values.  The first value is a list of bindings to be
 ;;; used with a LET* and the purpose of which is to destructure the
@@ -193,12 +205,12 @@
 ;;; macros in the expansion for the simple case of no keyword
 ;;; arguments.
 (defun destructure-lambda-list (lambda-list var)
-  (multiple-value-bind (required-bindings var1)
+  (multiple-value-bind (required-bindings reqign var1)
       (destructure-required (required lambda-list) var)
-    (multiple-value-bind (optional-bindings var2)
+    (multiple-value-bind (optional-bindings optign var2)
 	(destructure-optionals (optionals lambda-list) var1)
       (let ((error-check-bindings '())
-	    (variables-to-ignore '()))
+	    (variables-to-ignore (append reqign optign)))
 	;; Generate bindings that check some conditions.
 	(cond ((and (eq (rest-body lambda-list) :none)
 		    (eq (keys lambda-list) :none))
@@ -265,13 +277,30 @@
 	       ;; circular.  the remaining list is simply matched with
 	       ;; the &rest/&body pattern.
 	       nil))
-	(let ((rest-bindings
+	(let ((whole-bindings
+                (if (eq (whole lambda-list) :none)
+                    '()
+                    (multiple-value-bind (bindings ign)
+                        (destructure-pattern (whole lambda-list) var)
+                      (setf variables-to-ignore
+                            (append ign variables-to-ignore))
+                      bindings)))
+              (rest-bindings
 		(if (eq (rest-body lambda-list) :none)
 		    '()
-		    (destructure-pattern (rest-body lambda-list) var2)))
+		    (multiple-value-bind (bindings ign)
+                        (destructure-pattern (rest-body lambda-list) var2)
+                      (setf variables-to-ignore
+                            (append ign variables-to-ignore))
+                      bindings)))
 	      (key-bindings
-		(destructure-keys (keys lambda-list) var2)))
-	  (values (append required-bindings
+		(multiple-value-bind (bindings ign)
+                    (destructure-keys (keys lambda-list) var2)
+                  (setf variables-to-ignore
+                        (append ign variables-to-ignore))
+                  bindings)))
+	  (values (append whole-bindings
+                          required-bindings
 			  optional-bindings
 			  rest-bindings
 			  (reverse error-check-bindings)
@@ -285,19 +314,27 @@
 ;;; FIXME: say more.
 (defun destructure-pattern (pattern var)
   (cond ((null pattern)
-	 `((,(gensym) (unless (null ,var)
-			(error "tree should be NIL")))))
+         (let ((dummy (gensym)))
+           (values
+	    `((,dummy (unless (null ,var)
+		        (error "tree should be NIL"))))
+            (list dummy))))
 	((symbolp pattern)
-	 `((,pattern ,var)))
+	 (values `((,pattern ,var)) nil))
 	((consp pattern)
 	 (let ((temp1 (gensym))
 	       (temp2 (gensym)))
-	   (append `((,temp1 (if (consp ,var)
-				 (car ,var)
-				 (error "no match"))))
-		   (destructure-pattern (car pattern) temp1)
-		   `((,temp2 (cdr ,var)))
-		   (destructure-pattern (cdr pattern) temp2))))
+           (multiple-value-bind (carp carign)
+               (destructure-pattern (car pattern) temp1)
+             (multiple-value-bind (cdrp cdrign)
+                 (destructure-pattern (cdr pattern) temp2)
+               (values (append `((,temp1 (if (consp ,var)
+				             (car ,var)
+				             (error "no match"))))
+		               carp
+                               `((,temp2 (cdr ,var)))
+                               cdrp)
+                       (append carign cdrign))))))
 	(t
 	 (destructure-lambda-list pattern var))))
 
@@ -652,7 +689,7 @@
 ;;;
 ;;; According to CLtL2.
 
-(defun parse-macro (name lambda-list body &optional environment)
+(defun parse-macro (name lambda-list body &optional environment header-declarations)
   (declare (ignore environment)) ; For now.
   (let* ((parsed-lambda-list (parse-macro-lambda-list lambda-list))
 	 (env-var (environment parsed-lambda-list))
@@ -662,20 +699,25 @@
 	 (args-var (gensym)))
     (multiple-value-bind (bindings ignored-variables)
 	(destructure-lambda-list parsed-lambda-list args-var)
-      `(lambda (,final-form-var ,final-env-var)
-	 ;; If the lambda list does not contain &environment, then
-	 ;; we IGNORE the GENSYMed parameter to avoid warnings.
-	 ;; If the lambda list does contain &environment, we do
-	 ;; not want to make it IGNORABLE because we would want a
-	 ;; warning if it is not used then.
-	 ,@(if (eq env-var :none)
-	       `((declare (ignore ,final-env-var)))
-	       `())
-	 (let ((,args-var (cdr ,final-form-var)))
-	   (let* ,bindings
-	     (declare (ignore ,@ignored-variables))
-	     (block ,name ,@body)))))))
-	
+      (multiple-value-bind (declarations documentation body)
+          (separate-function-body body)
+        `(lambda (,final-form-var ,final-env-var)
+	   ;; If the lambda list does not contain &environment, then
+	   ;; we IGNORE the GENSYMed parameter to avoid warnings.
+	   ;; If the lambda list does contain &environment, we do
+	   ;; not want to make it IGNORABLE because we would want a
+	   ;; warning if it is not used then.
+	   ,@(if (eq env-var :none)
+	         `((declare (ignore ,final-env-var)))
+	         `())
+           (declare ,@header-declarations)
+           ,documentation
+	   (let ((,args-var (cdr ,final-form-var)))
+	     (let* ,bindings
+	       (declare (ignore ,@ignored-variables))
+               ,@declarations
+	       (block ,name ,@body))))))))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;
 ;;; PARSE-COMPILER-MACRO
@@ -683,7 +725,8 @@
 ;;; This function differs from parse-macro only in the code that
 ;;; destructures the lambda list from the arguments.
 
-(defun parse-compiler-macro (name lambda-list body &optional environment)
+(defun parse-compiler-macro (name lambda-list body
+                             &optional environment header-declarations)
   (declare (ignore environment)) ; For now.
   (let* ((parsed-lambda-list (parse-macro-lambda-list lambda-list))
 	 (env-var (environment parsed-lambda-list))
@@ -693,30 +736,37 @@
 	 (args-var (gensym)))
     (multiple-value-bind (bindings ignored-variables)
 	(destructure-lambda-list parsed-lambda-list args-var)
-      `(lambda (,final-form-var ,final-env-var)
-	 ;; If the lambda list does not contain &environment, then
-	 ;; we IGNORE the GENSYMed parameter to avoid warnings.
-	 ;; If the lambda list does contain &environment, we do
-	 ;; not want to make it IGNORABLE because we would want a
-	 ;; warning if it is not used then.
-	 ,@(if (eq env-var :none)
-	       `((declare (ignore ,final-env-var)))
-	       `())
-	 (let ((,args-var (if (and (eq (car ,final-form-var) 'funcall)
-				   (consp (cdr ,final-form-var))
-				   (consp (cadr ,final-form-var))
-				   (eq (car (cadr ,final-form-var)) 'function))
-			      (cddr ,final-form-var)
-			      (cdr ,final-form-var))))
-	   (let* ,bindings
-	     (declare (ignore ,@ignored-variables))
-	     (block ,name ,@body)))))))
+      (multiple-value-bind (declarations documentation body)
+          (separate-function-body body)
+        `(lambda (,final-form-var ,final-env-var)
+	   ;; If the lambda list does not contain &environment, then
+	   ;; we IGNORE the GENSYMed parameter to avoid warnings.
+	   ;; If the lambda list does contain &environment, we do
+	   ;; not want to make it IGNORABLE because we would want a
+	   ;; warning if it is not used then.
+	   ,@(if (eq env-var :none)
+	         `((declare (ignore ,final-env-var)))
+	         `())
+           (declare ,@header-declarations)
+           ,documentation
+	   (let ((,args-var (if (and (eq (car ,final-form-var) 'funcall)
+				  (consp (cdr ,final-form-var))
+				  (consp (cadr ,final-form-var))
+				  (eq (car (cadr ,final-form-var)) 'function))
+			        (cddr ,final-form-var)
+			        (cdr ,final-form-var))))
+	     (let* ,bindings
+	       (declare (ignore ,@ignored-variables))
+               ,@declarations
+	       (block ,name ,@body))))))))
 	
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;
 ;;; PARSE-DEFTYPE
 
-(defun parse-deftype (name lambda-list body)
+(defun parse-deftype (name lambda-list body
+                      &optional environment header-declarations)
+  (declare (ignore environment))
   (let* ((parsed-lambda-list (parse-deftype-lambda-list lambda-list))
 	 (env-var (environment parsed-lambda-list))
 	 (final-env-var (if (eq env-var :none) (gensym) env-var))
@@ -725,16 +775,23 @@
 	 (args-var (gensym)))
     (multiple-value-bind (bindings ignored-variables)
 	(destructure-lambda-list parsed-lambda-list args-var)
-      `(lambda (,final-form-var ,final-env-var)
-	 ;; If the lambda list does not contain &environment, then
-	 ;; we IGNORE the GENSYMed parameter to avoid warnings.
-	 ;; If the lambda list does contain &envionrment, we do
-	 ;; not want to make it IGNORABLE because we would want a
-	 ;; warning if it is not used then.
-	 ,@(if (eq env-var :none)
-	       `((declare (ignore ,final-env-var)))
-	       `())
-	 (let ((,args-var (cdr ,final-form-var)))
-	   (let* ,bindings
-	     (declare (ignore ,@ignored-variables))
-	     (block ,name ,@body)))))))
+      (multiple-value-bind (declarations documentation body)
+          (separate-function-body body)
+        `(lambda (,final-form-var ,final-env-var)
+	   ;; If the lambda list does not contain &environment, then
+	   ;; we IGNORE the GENSYMed parameter to avoid warnings.
+	   ;; If the lambda list does contain &envionrment, we do
+	   ;; not want to make it IGNORABLE because we would want a
+	   ;; warning if it is not used then.
+	   ,@(if (eq env-var :none)
+	         `((declare (ignore ,final-env-var)))
+	         `())
+           (declare ,@header-declarations)
+           ,documentation
+	   (let ((,args-var (if (consp ,final-form-var)
+                                (cdr ,final-form-var)
+                                nil)))
+	     (let* ,bindings
+	       (declare (ignore ,@ignored-variables))
+               ,@declarations
+	       (block ,name ,@body))))))))

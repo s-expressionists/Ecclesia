@@ -195,6 +195,8 @@
   (let* ((remaining canonicalized-lambda-list)
          (bindings '())
          (ignored-variables '()))
+    (when (first-group-is remaining '&whole)
+      (push `(,(second (pop remaining)) ,variable) bindings))
     (unless (or (null remaining)
                 (member (first (first remaining)) (intrinsic-keywords)
                         :test #'eq))
@@ -257,7 +259,7 @@
 ;;; According to CLtL2.
 
 (defun parse-macro-using-canonicalization
-    (name lambda-list body &optional environment)
+    (name lambda-list body &optional environment header-declarations)
   (declare (ignore environment)) ; For now.
   (let* ((canonicalized-lambda-list
            (canonicalize-macro-lambda-list lambda-list))
@@ -289,6 +291,7 @@
            ,@(if (null environment-group)
                  `((declare (ignore ,environment-parameter)))
                  `())
+           (declare ,@header-declarations)
            (block ,name
              (let ((,args-var (rest ,whole-parameter)))
                (let* ,(reverse bindings)
@@ -304,7 +307,7 @@
 ;;; destructures the lambda list from the arguments.
 
 (defun parse-compiler-macro-using-canonicalization
-    (name lambda-list body &optional environment)
+    (name lambda-list body &optional environment header-declarations)
   (declare (ignore name environment)) ; For now.
   (let* ((canonicalized-lambda-list
            (canonicalize-macro-lambda-list lambda-list))
@@ -336,6 +339,7 @@
            ,@(if (null environment-group)
                  `((declare (ignore ,environment-parameter)))
                  `())
+           (declare ,@header-declarations)
            (block ,name
              (let ((,args-var (if (and (eq (car ,whole-parameter) 'funcall)
                                        (consp (cdr ,whole-parameter))
@@ -384,6 +388,7 @@
            ,@(if (null environment-group)
                  `((declare (ignore ,environment-parameter)))
                  `())
+           (declare ,@header-declarations)
            (let ((,args-var (rest ,whole-parameter)))
              (let* ,(reverse bindings)
                (declare (ignore ,@ignored-variables))
