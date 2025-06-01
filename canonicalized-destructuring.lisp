@@ -51,8 +51,8 @@
 ;;; checked for errors.
 
 ;;; Given a list of the remaining groups of a lambda list, return true
-;;; if and only the list is not empty, and the first group of the list
-;;; starts with LAMBDA-LIST-KEYWORD.
+;;; if and only if the list is not empty, and the first group of the
+;;; list starts with LAMBDA-LIST-KEYWORD.
 (defun first-group-is (remaining lambda-list-keyword)
   (and (not (null remaining))
        (not (null (first remaining)))
