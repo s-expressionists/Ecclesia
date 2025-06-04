@@ -356,7 +356,8 @@
 ;;;
 ;;; PARSE-DEFTYPE
 
-(defun parse-deftype-using-canonicalization (name lambda-list body)
+(defun parse-deftype-using-canonicalization
+    (name lambda-list body &optional environment header-declarations)
   (declare (ignore name))
   (let* ((canonicalized-lambda-list
            (canonicalize-deftype-lambda-list lambda-list))
