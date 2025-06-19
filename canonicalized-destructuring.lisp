@@ -63,53 +63,72 @@
 ;;; list of variables to ignore.
 (defun destructure-canonicalized-required
     (required variable canonicalized-lambda-list)
-  (let ((bindings '())
-        (ignored-variables '())
-        (not-enough-arguments-form
-          `(error 'too-few-arguments
-                  :lambda-list
-                  ',(reduce #'append canonicalized-lambda-list))))
+  (let* ((bindings '())
+         (ignored-variables '())
+         (e-lambda-list (reduce #'append canonicalized-lambda-list))
+         (not-enough-arguments-form
+           `(error 'too-few-arguments
+                   :lambda-list ',e-lambda-list)))
     (loop for pattern in required
-          do (if (symbolp pattern)
-                 (progn (push `(,pattern (if (null ,variable)
-                                             ,not-enough-arguments-form
-                                             (first ,variable)))
-                              bindings)
-                        (push `(,variable (rest ,variable))
-                              bindings))
-                 (let ((temp (gensym)))
-                   (push `(,temp (if (null ,variable)
-                                     ,not-enough-arguments-form
-                                     (first ,variable)))
-                         bindings)
-                   (push `(,variable (rest ,variable))
-                         bindings)
-                   (multiple-value-bind
-                         (nested-bindings nested-ignored-variables)
-                       (destructure-canonicalized-lambda-list
-                        pattern temp)
-                     (setf bindings
-                           (append nested-bindings bindings))
-                     (setf ignored-variables
-                           (append nested-ignored-variables ignored-variables))))))
+          for bind = (if (and (symbolp pattern) (not (null pattern)))
+                         pattern
+                         (gensym))
+          do (push `(,bind (if (null ,variable)
+                               ,not-enough-arguments-form
+                               (first ,variable)))
+                   bindings)
+             (push `(,variable (rest ,variable)) bindings)
+             (cond ((null pattern)
+                    (let ((check (gensym)))
+                      (push `(,check (unless (null ,bind)
+                                       (error 'too-many-arguments
+                                              :lambda-list
+                                              ',e-lambda-list)))
+                            bindings)
+                      (push check ignored-variables)))
+                   ((symbolp pattern))
+                   (t (multiple-value-bind
+                            (nested-bindings nested-ignored-variables)
+                          (destructure-canonicalized-lambda-list
+                           pattern bind)
+                        (setf bindings
+                              (append nested-bindings bindings))
+                        (setf ignored-variables
+                              (append nested-ignored-variables ignored-variables))))))
     (values bindings ignored-variables)))
 
-;;; Destructure an optional parameter.  Return a list of bindings.
-(defun destructure-canonicalized-optional (optional variable)
-  (let ((bindings '()))
+;;; Destructure a list of optional parameters.
+;;; Return a list of bindings and a list of variables to ignore.
+(defun destructure-canonicalized-optional (optional variable
+                                           canonicalized-lambda-list)
+  (let ((bindings '()) (ignored '()))
     (loop for (var default supplied-p) in optional
+          for bind = (if (and (symbolp var) (not (null var))) var (gensym))
           do (unless (null supplied-p)
                (push `(,supplied-p (not (null ,variable)))
                      bindings))
-             (push `(,var (if (null ,variable)
-                              ,default
-                              (first ,variable)))
+             (push `(,bind (if (null ,variable)
+                               ,default
+                               (first ,variable)))
                    bindings)
              (push `(,variable (if (null ,variable)
                                    ,variable
                                    (rest ,variable)))
-                   bindings))
-    bindings))
+                   bindings)
+             (cond ((null var)
+                    (let ((check (gensym)))
+                      (push `(,check (unless (null ,bind)
+                                       (error 'too-many-arguments
+                                              :lambda-list
+                                              ',(reduce #'append canonicalized-lambda-list))))
+                            bindings)
+                      (push check ignored)))
+                   ((symbolp var))
+                   (t (multiple-value-bind (nested-bindings nested-ignore)
+                          (destructure-canonicalized-lambda-list var bind)
+                        (setf bindings (append nested-bindings bindings)
+                              ignored (append nested-ignore ignored))))))
+    (values bindings ignored)))
 
 ;;; Destructure a &REST or &BODY parameter which can be a variable or
 ;;; a pattern.  Return a list of bindings and a list of variables to
@@ -173,6 +192,7 @@
     (loop for ((keyword var) default supplied-p) in key
           for temp1 = (gensym)
           for temp2 = (gensym)
+          for bind = (if (and (symbolp var) (not (null var))) var (gensym))
           do (push `(,temp1 (list nil)) bindings)
              (push `(,temp2 (getf ,variable ,keyword ,temp1))
                    bindings)
@@ -180,10 +200,23 @@
                  nil
                  (push `(,supplied-p (not (eq ,temp2 ,temp1)))
                        bindings))
-             (push `(,var (if (eq ,temp2 ,temp1)
+             (push `(,bind (if (eq ,temp2 ,temp1)
                               ,default
                               ,temp2))
-                   bindings))
+                   bindings)
+             (cond ((null var)
+                    (let ((check (gensym)))
+                      (push `(,check (unless (null ,bind)
+                                       (error 'too-many-arguments
+                                              :lambda-list
+                                              ',(reduce #'append canonicalized-lambda-list))))
+                            bindings)
+                      (push check ignored-variables)))
+                   ((symbolp var))
+                   (t (multiple-value-bind (nested-bindings nested-ignore)
+                          (destructure-canonicalized-lambda-list var bind)
+                        (setf bindings (append nested-bindings bindings)
+                              ignored-variables (append nested-ignore ignored-variables))))))
     (values bindings ignored-variables)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -208,10 +241,11 @@
         (setf ignored-variables
               (append nested-ignored-variables ignored-variables))))
     (when (first-group-is remaining '&optional)
-      (setf bindings
-            (append (destructure-canonicalized-optional
-                     (rest (pop remaining)) variable)
-                    bindings)))
+      (multiple-value-bind (nested-bindings nested-ignore)
+          (destructure-canonicalized-optional
+           (rest (pop remaining)) variable canonicalized-lambda-list)
+        (setf bindings (append nested-bindings bindings)
+              ignored-variables (append nested-ignore ignored-variables))))
     (unless (or (member '&rest remaining :key #'first :test #'eq)
                 (member '&body remaining :key #'first :test #'eq)
                 (member '&key remaining :key #'first :test #'eq))
@@ -308,7 +342,7 @@
 
 (defun parse-compiler-macro-using-canonicalization
     (name lambda-list body &optional environment header-declarations)
-  (declare (ignore name environment)) ; For now.
+  (declare (ignore environment)) ; For now.
   (let* ((canonicalized-lambda-list
            (canonicalize-macro-lambda-list lambda-list))
          (environment-group
@@ -389,7 +423,6 @@
            ,@(if (null environment-group)
                  `((declare (ignore ,environment-parameter)))
                  `())
-           (declare ,@header-declarations)
            (let ((,args-var (rest ,whole-parameter)))
              (let* ,(reverse bindings)
                (declare (ignore ,@ignored-variables))

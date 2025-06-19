@@ -234,9 +234,6 @@
 (defun canonicalize-ordinary-optional (optional)
   (canonicalize-nontrivial-optional optional 'nil))
 
-(defun canonicalize-deftype-optional (optional)
-  (canonicalize-nontrivial-optional optional ''*))
-
 (defun canonicalize-ordinary-rest (parameter)
   (unless (and (symbolp parameter)
                (not (constantp parameter)))
@@ -298,9 +295,6 @@
 
 (defun canonicalize-ordinary-key (key)
   (canonicalize-nontrivial-key key 'nil))
-
-(defun canonicalize-deftype-key (key)
-  (canonicalize-nontrivial-key key '*))
 
 ;;; Canonicalize a defgeneric &optional item.
 ;;; We canonicalize it, so that instead of having the original
@@ -417,12 +411,43 @@
   parameter)
 
 (defun canonicalize-destructuring-required (parameter)
-  (cond ((and (symbolp parameter) (not (constantp parameter)))
+  (cond ((and (symbolp parameter) (or (null parameter) (not (constantp parameter))))
          parameter)
         ((consp parameter)
          (canonicalize-destructuring-lambda-list parameter))
         (t
          (error "Required must be a variable or a CONS."))))
+
+(defun canonicalize-nontrivial-destructuring-optional (optional default)
+  (if (consp optional)
+      (multiple-value-bind (length structure)
+          (list-structure optional)
+        (unless (and (eq structure :proper)
+                     (<= 1 length 3)
+                     (or (< length 3)
+                         (and (symbolp (caddr optional))
+                              (not (constantp (caddr optional))))))
+          (error 'malformed-destructuring-optional :code optional))
+        (cond ((and (symbolp (first optional))
+                    (or (null (first optional)) (not (constantp (first optional)))))
+               `(,(first optional) ,(if (> length 1) (second optional) default)
+                 . ,(cddr optional)))
+              ((consp (first optional))
+               `(,(canonicalize-destructuring-lambda-list (first optional))
+                 ,(if (> length 1) (second optional) default)
+                 . ,(cddr optional)))
+              (t (error 'malformed-destructuring-optional :code optional))))
+      (progn
+        (unless (and (symbolp optional)
+                     (not (constantp optional)))
+          (error 'malformed-destructuring-optional :code optional))
+        `(,optional ,default))))
+
+(defun canonicalize-destructuring-optional (optional)
+  (canonicalize-nontrivial-destructuring-optional optional 'nil))
+
+(defun canonicalize-deftype-optional (optional)
+  (canonicalize-nontrivial-destructuring-optional optional ''*))
 
 (defun canonicalize-destructuring-rest (parameter)
   (cond ((and (symbolp parameter) (not (constantp parameter)))
@@ -431,6 +456,51 @@
          (canonicalize-destructuring-lambda-list parameter))
         (t
          (error "&REST or &BODY parameter must be a variable or a CONS."))))
+
+(defun canonicalize-nontrivial-destructuring-key (key default)
+  (if (consp key)
+      (multiple-value-bind (length structure)
+          (list-structure key)
+        (cond ((not (and (eq structure :proper)
+                         (<= 1 length 3)
+                         (or (< length 3)
+                             (and (symbolp (caddr key))
+                                  (not (constantp (caddr key)))))))
+               (error 'malformed-destructuring-key
+                      :code key))
+              ((symbolp (car key))
+               (when (constantp (car key))
+                 (error 'malformed-destructuring-key :code key))
+               `((,(intern (symbol-name (car key)) :keyword) ,(car key))
+                 ,(if (> length 1) (cadr key) default)
+                 . ,(cddr key)))
+              ((or (not (consp (car key)))
+                   (not (symbolp (caar key)))
+                   (not (consp (cdar key)))
+                   (not (null (cddar key))))
+               (error 'malformed-destructuring-key :code key))
+              ((symbolp (cadar key))
+               (when (constantp (cadar key))
+                 (error 'malformed-destructuring-key :code key))
+               `((,(caar key) ,(cadar key)) ,(if (> length 1) (cadr key) default)
+                 . ,(cddr key)))
+              ((consp (cadar key))
+               `((,(caar key) ,(canonicalize-destructuring-lambda-list (cadar key)))
+                 ,(if (> length 1) (cadr key) default)
+                 . ,(cddr key)))
+              (t (error 'malformed-destructuring-key :code key))))
+      (progn
+        (unless (and (symbolp key)
+                     (not (constantp key)))
+          (error 'malformed-destructuring-key
+                 :code key))
+        `((,(intern (symbol-name key) :keyword) ,key) ,default))))
+
+(defun canonicalize-destructuring-key (key)
+  (canonicalize-nontrivial-destructuring-key key 'nil))
+
+(defun canonicalize-deftype-key (key)
+  (canonicalize-nontrivial-destructuring-key key ''*))
 
 ;;; Canonicalize an &aux item.
 ;;; We canonicalize it, so that instead of having the original
@@ -489,20 +559,20 @@
   `((nil . ,#'canonicalize-destructuring-required)
     (&whole . ,#'canonicalize-whole)
     (&environment . ,#'canonicalize-environment)
-    (&optional . ,#'canonicalize-ordinary-optional)
+    (&optional . ,#'canonicalize-destructuring-optional)
     (&rest . ,#'canonicalize-destructuring-rest)
     (&body . ,#'canonicalize-destructuring-rest)
-    (&key . ,#'canonicalize-ordinary-key)
+    (&key . ,#'canonicalize-destructuring-key)
     (&allow-other-keys . ,#'identity)
     (&aux . ,#'canonicalize-aux)))
 
 (defparameter *destructuring-canonicalizers*
   `((nil . ,#'canonicalize-destructuring-required)
     (&whole . ,#'canonicalize-whole)
-    (&optional . ,#'canonicalize-ordinary-optional)
+    (&optional . ,#'canonicalize-destructuring-optional)
     (&rest . ,#'canonicalize-destructuring-rest)
     (&body . ,#'canonicalize-destructuring-rest)
-    (&key . ,#'canonicalize-ordinary-key)
+    (&key . ,#'canonicalize-destructuring-key)
     (&allow-other-keys . ,#'identity)
     (&aux . ,#'canonicalize-aux)))
 
@@ -563,7 +633,7 @@
            ;; empty list, we will accomplish this effect.  In the
            ;; second case, we want the first group to start with 0 and
            ;; end with a value greater than 0, so we eliminate the
-           ;; first element of POSITIONS to accomlish this effect.
+           ;; first element of POSITIONS to accomplish this effect.
            (if (zerop (first positions)) (rest positions) positions))
          (result 
            (loop for start = 0 then end
