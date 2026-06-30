@@ -423,6 +423,7 @@
            ,@(if (null environment-group)
                  `((declare (ignore ,environment-parameter)))
                  `())
+           (declare ,@header-declarations)
            (let ((,args-var (rest ,whole-parameter)))
              (let* ,(reverse bindings)
                (declare (ignore ,@ignored-variables))
