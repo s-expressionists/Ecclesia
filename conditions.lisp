@@ -22,19 +22,22 @@
    (%min-argcount :initarg :min-argcount :reader min-argcount)
    (%max-argcount :initarg :max-argcount :reader max-argcount)))
 
-;;; FIXME: improve these conditions!
-
-(define-condition too-few-arguments
+(define-condition destructure-failure
     (program-error acclimation:condition)
-  ())
+  ((%operator :initarg :operator :reader operator)
+   (%lambda-list :initarg :lambda-list :reader lambda-list)
+   (%arguments :initarg :arguments :reader arguments)))
 
-(define-condition too-many-arguments
-    (program-error acclimation:condition)
-  ())
+(define-condition too-few-arguments (destructure-failure) ())
+(define-condition too-many-arguments (destructure-failure) ())
+(define-condition odd-number-of-keyword-arguments (destructure-failure) ())
 
-(define-condition odd-number-of-keyword-arguments
-    (program-error acclimation:condition)
-  ())
+(define-condition invalid-keywords (program-error acclimation:condition)
+  ((%operator :initarg :operator :reader operator)
+   (%recognized-keywords :initarg :recognized-keywords
+                         :reader recognized-keywords)
+   (%unknown-keywords :initarg :unknown-keywords
+                      :reader unknown-keywords)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;

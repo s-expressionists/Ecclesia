@@ -62,12 +62,15 @@
 ;;; may be a variable or a pattern.  Return a list of bindings and a
 ;;; list of variables to ignore.
 (defun destructure-canonicalized-required
-    (required variable canonicalized-lambda-list)
-  (let* ((bindings '())
+    (required variable canonicalized-lambda-list &key operator)
+  (let* ((original-arguments (gensym))
+         (bindings (list `(,original-arguments ,variable)))
          (ignored-variables '())
          (e-lambda-list (reduce #'append canonicalized-lambda-list))
          (not-enough-arguments-form
            `(error 'too-few-arguments
+                   :operator ',operator
+                   :arguments ,original-arguments
                    :lambda-list ',e-lambda-list)))
     (loop for pattern in required
           for bind = (if (and (symbolp pattern) (not (null pattern)))
@@ -82,15 +85,16 @@
                     (let ((check (gensym)))
                       (push `(,check (unless (null ,bind)
                                        (error 'too-many-arguments
-                                              :lambda-list
-                                              ',e-lambda-list)))
+                                              :operator ',operator
+                                              :arguments ,bind
+                                              :lambda-list ',pattern)))
                             bindings)
                       (push check ignored-variables)))
                    ((symbolp pattern))
                    (t (multiple-value-bind
                             (nested-bindings nested-ignored-variables)
                           (destructure-canonicalized-lambda-list
-                           pattern bind)
+                           pattern bind :operator operator)
                         (setf bindings
                               (append nested-bindings bindings))
                         (setf ignored-variables
@@ -100,7 +104,8 @@
 ;;; Destructure a list of optional parameters.
 ;;; Return a list of bindings and a list of variables to ignore.
 (defun destructure-canonicalized-optional (optional variable
-                                           canonicalized-lambda-list)
+                                           canonicalized-lambda-list
+                                           &key operator)
   (let ((bindings '()) (ignored '()))
     (loop for (var default supplied-p) in optional
           for bind = (if (and (symbolp var) (not (null var))) var (gensym))
@@ -119,13 +124,15 @@
                     (let ((check (gensym)))
                       (push `(,check (unless (null ,bind)
                                        (error 'too-many-arguments
-                                              :lambda-list
-                                              ',(reduce #'append canonicalized-lambda-list))))
+                                              :operator ',operator
+                                              :lambda-list ',var
+                                              :arguments ,bind)))
                             bindings)
                       (push check ignored)))
                    ((symbolp var))
                    (t (multiple-value-bind (nested-bindings nested-ignore)
-                          (destructure-canonicalized-lambda-list var bind)
+                          (destructure-canonicalized-lambda-list
+                           var bind :operator operator)
                         (setf bindings (append nested-bindings bindings)
                               ignored (append nested-ignore ignored))))))
     (values bindings ignored)))
@@ -134,7 +141,7 @@
 ;;; a pattern.  Return a list of bindings and a list of variables to
 ;;; ignore.
 (defun destructure-canonicalized-rest/body
-    (pattern variable)
+    (pattern variable &key operator)
   (let ((bindings '())
         (ignored-variables '()))
     (if (symbolp pattern)
@@ -144,7 +151,7 @@
                 bindings)
           (multiple-value-bind (nested-bindings nested-ignored-variables)
               (destructure-canonicalized-lambda-list
-               pattern temp)
+               pattern temp :operator operator)
             (setf bindings
                   (append nested-bindings bindings))
             (setf ignored-variables
@@ -154,30 +161,38 @@
 ;;; Destructure a list of &KEY parameters.  Return a list of bindings
 ;;; and a list of variables to ignore.
 (defun destructure-canonicalized-key
-    (key variable canonicalized-lambda-list allow-other-keys)
-  (let* ((bindings '())
+    (key variable canonicalized-lambda-list allow-other-keys
+     &key operator)
+  (let* ((original-plist (gensym))
+         (bindings (list `(,original-plist ,variable)))
          (ignored-variables '())
          (keywords (mapcar #'caar key))
+         (e-lambda-list (reduce #'append canonicalized-lambda-list))
          (odd-number-of-keyword-arguments-form
            `(error 'odd-number-of-keyword-arguments
-                   :lambda-list
-                   ',(reduce #'append canonicalized-lambda-list)))
+                   :operator ',operator
+                   :arguments ,original-plist
+                   :lambda-list ',e-lambda-list))
          (check-keywords-form
-           (let ((temp (gensym)))
-             `(let ((,temp ,variable))
+           (let ((temp (gensym))
+                 (unrecognized (gensym)))
+             `(let ((,temp ,variable)
+                    (,unrecognized ()))
                 (tagbody
                  again
                    (if (null ,temp) (go out))
-                   (if (not (member (first ,temp)
-                                    '(:allow-other-keys ,@keywords)
-                                    :test #'eq))
-                       (error 'invalid-keyword
-                              :keyword (first ,temp)
-                              :lambda-list
-                              ',(reduce #'append canonicalized-lambda-list))
-                       (progn (setf ,temp (cddr ,temp))
-                              (go again)))
-                 out)))))
+                   (unless (member (first ,temp)
+                                   '(:allow-other-keys ,@keywords)
+                                   :test #'eq)
+                     (push (first ,temp) ,unrecognized))
+                   (setf ,temp (cddr ,temp))
+                   (go again)
+                 out)
+                (unless (null ,unrecognized)
+                  (error 'invalid-keywords
+                         :operator ',operator
+                         :unknown-keywords ,unrecognized
+                         :recognized-keywords ',keywords))))))
     (let ((ignored (gensym)))
       (push ignored ignored-variables)
       (push `(,ignored (if (oddp (length ,variable))
@@ -208,13 +223,15 @@
                     (let ((check (gensym)))
                       (push `(,check (unless (null ,bind)
                                        (error 'too-many-arguments
-                                              :lambda-list
-                                              ',(reduce #'append canonicalized-lambda-list))))
+                                              :operator ',operator
+                                              :lambda-list ',var
+                                              :arguments ,bind)))
                             bindings)
                       (push check ignored-variables)))
                    ((symbolp var))
                    (t (multiple-value-bind (nested-bindings nested-ignore)
-                          (destructure-canonicalized-lambda-list var bind)
+                          (destructure-canonicalized-lambda-list
+                           var bind :operator operator)
                         (setf bindings (append nested-bindings bindings)
                               ignored-variables (append nested-ignore ignored-variables))))))
     (values bindings ignored-variables)))
@@ -224,9 +241,15 @@
 ;;; DESTRUCTURE-CANONICALIZED-LAMBDA-LIST
 
 (defun destructure-canonicalized-lambda-list
-    (canonicalized-lambda-list variable)
+    (canonicalized-lambda-list variable &key operator)
   (let* ((remaining canonicalized-lambda-list)
-         (bindings '())
+         (unboundedp (or (member '&rest remaining :key #'first :test #'eq)
+                         (member '&body remaining :key #'first :test #'eq)
+                         (member '&key remaining :key #'first :test #'eq)))
+         (original-arguments (unless unboundedp (gensym)))
+         (bindings (if unboundedp
+                       ()
+                       (list `(,original-arguments ,variable))))
          (ignored-variables '()))
     (when (first-group-is remaining '&whole)
       (push `(,(second (pop remaining)) ,variable) bindings))
@@ -235,7 +258,8 @@
                         :test #'eq))
       (multiple-value-bind (nested-bindings nested-ignored-variables)
           (destructure-canonicalized-required
-           (pop remaining) variable canonicalized-lambda-list)
+           (pop remaining) variable canonicalized-lambda-list
+           :operator operator)
         (setf bindings
               (append nested-bindings bindings))
         (setf ignored-variables
@@ -243,16 +267,17 @@
     (when (first-group-is remaining '&optional)
       (multiple-value-bind (nested-bindings nested-ignore)
           (destructure-canonicalized-optional
-           (rest (pop remaining)) variable canonicalized-lambda-list)
+           (rest (pop remaining)) variable canonicalized-lambda-list
+           :operator operator)
         (setf bindings (append nested-bindings bindings)
               ignored-variables (append nested-ignore ignored-variables))))
-    (unless (or (member '&rest remaining :key #'first :test #'eq)
-                (member '&body remaining :key #'first :test #'eq)
-                (member '&key remaining :key #'first :test #'eq))
+    (unless unboundedp
       (let ((temp (gensym)))
         (push temp ignored-variables)
         (push `(,temp (if (not (null ,variable))
                           (error 'too-many-arguments
+                                 :operator ',operator
+                                 :arguments ,original-arguments
                                  :lambda-list
                                  ',(reduce #'append canonicalized-lambda-list))))
               bindings)))
@@ -260,7 +285,8 @@
               (first-group-is remaining '&body))
       (multiple-value-bind (nested-bindings nested-ignored-variables)
           (destructure-canonicalized-rest/body
-           (second (pop remaining)) variable)
+           (second (pop remaining)) variable
+           :operator operator)
         (setf bindings
               (append nested-bindings bindings))
         (setf ignored-variables
@@ -276,7 +302,8 @@
              (rest group)
              variable
              canonicalized-lambda-list
-             allow-other-keys)
+             allow-other-keys
+             :operator operator)
           (setf bindings
                 (append nested-bindings bindings))
           (setf ignored-variables
@@ -314,7 +341,8 @@
     (multiple-value-bind (declarations documentation forms)
         (separate-function-body body)
       (multiple-value-bind (bindings ignored-variables)
-          (destructure-canonicalized-lambda-list remaining args-var)
+          (destructure-canonicalized-lambda-list remaining args-var
+                                                 :operator name)
         `(lambda (,whole-parameter ,environment-parameter)
            ,@(if (null documentation) '() (list documentation))
            ;; If the lambda list does not contain &environment, then
@@ -362,7 +390,8 @@
     (multiple-value-bind (declarations documentation forms)
         (separate-function-body body)
       (multiple-value-bind (bindings ignored-variables)
-          (destructure-canonicalized-lambda-list remaining args-var)
+          (destructure-canonicalized-lambda-list remaining args-var
+                                                 :operator name)
         `(lambda (,whole-parameter ,environment-parameter)
            ,@(if (null documentation) '() (list documentation))
            ;; If the lambda list does not contain &environment, then
@@ -392,7 +421,7 @@
 
 (defun parse-deftype-using-canonicalization
     (name lambda-list body &optional environment header-declarations)
-  (declare (ignore name environment))
+  (declare (ignore environment))
   (let* ((canonicalized-lambda-list
            (canonicalize-deftype-lambda-list lambda-list))
          (environment-group
@@ -412,7 +441,8 @@
     (multiple-value-bind (declarations documentation forms)
         (separate-function-body body)
       (multiple-value-bind (bindings ignored-variables)
-          (destructure-canonicalized-lambda-list remaining args-var)
+          (destructure-canonicalized-lambda-list remaining args-var
+                                                 :operator name)
         `(lambda (,whole-parameter ,environment-parameter)
            ,@(if (null documentation) '() (list documentation))
            ;; If the lambda list does not contain &environment, then
@@ -424,11 +454,12 @@
                  `((declare (ignore ,environment-parameter)))
                  `())
            (declare ,@header-declarations)
-           (let ((,args-var (rest ,whole-parameter)))
-             (let* ,(reverse bindings)
-               (declare (ignore ,@ignored-variables))
-               ,@declarations
-               ,@forms)))))))
+           (block ,name
+             (let ((,args-var (rest ,whole-parameter)))
+               (let* ,(reverse bindings)
+                 (declare (ignore ,@ignored-variables))
+                 ,@declarations
+                 ,@forms))))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;

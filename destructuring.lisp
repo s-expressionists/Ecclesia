@@ -509,12 +509,12 @@
      (progn
        ,@(if (plusp required-count)
 	     `((if (< ,arg-count-var ,required-count)
-		   (error 'too-few-arguments)))
+		   (error "too few arguments supplied")))
 	     '())
        ,@(if (and (not rest-p) (not key-p))
 	     `((if (> ,arg-count-var
 		      ,(+ required-count optional-count))
-		   (error 'too-many-arguments)))
+		   (error "too many arguments supplied")))
 	     '())
        ,@(if key-p
 	     (if (evenp (+ required-count optional-count))
@@ -522,12 +522,12 @@
 				 ,(+ required-count
 				     optional-count))
 			      (oddp ,arg-count-var))
-		     (error 'odd-number-of-keyword-arguments)))
+		     (error "odd number of keyword arguments supplied")))
 		 `((when (and (> ,arg-count-var
 				 ,(+ required-count
 				     optional-count))
 			      (evenp ,arg-count-var))
-		     (error 'odd-number-of-keyword-arguments))))
+		     (error "odd number of keyword arguments supplied"))))
 	     '())))))
 
 (defun match-lambda-list (lambda-list arg-count-op arg-op)

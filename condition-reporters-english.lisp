@@ -22,6 +22,39 @@
 	  "The form that causes the problem was:~%~s"
 	  (form condition)))
 
+(defmethod acclimation:report-condition
+    ((condition too-few-arguments) stream (language acclimation:english))
+  (format stream
+          "~@[While destructuring arguments to ~a:~@
+           ~]Too few arguments in~%~2t~:a~@
+           to satisfy lambda list~%~2t~:a"
+          (operator condition) (arguments condition) (lambda-list condition)))
+(defmethod acclimation:report-condition
+    ((condition too-many-arguments) stream (language acclimation:english))
+  (format stream
+          "~@[While destructuring arguments to ~a:~@
+           ~]Too many arguments in~%~2t~:a~@
+           to satisfy lambda list~%~2t~:a"
+          (operator condition) (arguments condition) (lambda-list condition)))
+(defmethod acclimation:report-condition
+    ((condition odd-number-of-keyword-arguments) stream
+     (language acclimation:english))
+  (format stream
+          "~@[While destructuring arguments to ~a:~@
+           ~]Odd-length keywords plist~%~2t~a~@
+           for lambda list~%~2t~:a"
+          (operator condition) (arguments condition) (lambda-list condition)))
+
+(defmethod acclimation:report-condition
+    ((condition invalid-keywords) stream (language acclimation:english))
+  (format stream
+          "~@[While destructuring arguments to ~a:~@
+           ~]Unknown keyword arguments~%~2t~:a~@
+           while expecting any of~%~2t~:a"
+          (operator condition)
+          (unknown-keywords condition)
+          (recognized-keywords condition)))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;
 ;;;  Lambda list conditions.
