@@ -392,7 +392,7 @@
 
 (defun parse-deftype-using-canonicalization
     (name lambda-list body &optional environment header-declarations)
-  (declare (ignore name))
+  (declare (ignore name environment))
   (let* ((canonicalized-lambda-list
            (canonicalize-deftype-lambda-list lambda-list))
          (environment-group
