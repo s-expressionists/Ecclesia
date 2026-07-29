@@ -403,7 +403,7 @@
                  `((declare (ignore ,environment-parameter)))
                  `())
            (declare ,@header-declarations)
-           (block ,name
+           (block ,(function-block-name name)
              (let ((,args-var (if (and (eq (car ,whole-parameter) 'funcall)
                                        (consp (cdr ,whole-parameter))
                                        (consp (cadr ,whole-parameter))

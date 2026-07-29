@@ -758,8 +758,15 @@
 	     (let* ,bindings
 	       (declare (ignore ,@ignored-variables))
                ,@declarations
-	       (block ,name ,@body))))))))
-	
+	       (block ,(function-block-name name) ,@body))))))))
+
+;;; Given a function name, return the name of the implicit block that
+;;; the macro function establishes.
+(defun function-block-name (function-name)
+  (etypecase function-name
+    (symbol function-name)
+    ((cons (eql setf) (cons symbol null)) (second function-name))))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;
 ;;; PARSE-DEFTYPE
